@@ -2285,14 +2285,18 @@ class CloudflarePeer extends RelayEvents{
    if(this.destroyed)return;
    this.disconnected=true;
    for(const c of this.connections.values()){if(c.open){c.open=false;c.emit('close')}}
-   if(!failureNotified){failureNotified=true;if(this.hostSide)this.emit('disconnected');else this.emit('error',{type:'socket-closed',message:'Cloudflare relay connection closed'})}
+   if(!failureNotified){
+    failureNotified=true;
+    if(this.hostSide&&!settled)this.emit('error',{type:'socket-closed',message:'Cloudflare relay closed before the host handshake completed'});
+    else if(this.hostSide)this.emit('disconnected');
+    else this.emit('error',{type:'socket-closed',message:'Cloudflare relay connection closed'});
+   }
   });
   ws.addEventListener('error',()=>{
    clearTimeout(handshakeTimer);
    if(this.destroyed||failureNotified)return;
    failureNotified=true;
-   if(this.hostSide)this.emit('disconnected');
-   else this.emit('error',{type:'socket-error',message:'Cloudflare relay socket error'});
+   this.emit('error',{type:'socket-error',message:'Cloudflare relay WebSocket failed. Check Discord proxy mapping and relay access.'});
   });
  }
  connect(target){
@@ -2896,7 +2900,14 @@ if (window.parent !== window) {
       window.dispatchEvent(new CustomEvent("bigcon-discord-ready"));
       console.info("[BigCon Discord] Embedded App SDK ready.");
     } catch (error) {
-      console.warn("[BigCon Discord] Activity SDK could not initialise:", error);
+      console.error("[BigCon Discord] Activity SDK could not initialise:", error);
+      const detail = error && (error.message || error.toString()) || "Unknown SDK error";
+      const status = document.getElementById("netStatus");
+      if (status) {
+        status.textContent = "Discord SDK failed to initialise: " + detail + ". Check the /sdk → esm.sh URL mapping.";
+        status.classList.add("err");
+      }
+      window.dispatchEvent(new CustomEvent("bigcon-discord-sdk-error", { detail }));
     }
   })();
 }
