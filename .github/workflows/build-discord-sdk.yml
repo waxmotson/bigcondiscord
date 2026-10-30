@@ -20,9 +20,8 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
       - name: Install pinned dependencies
-        run: npm install --package-lock-only && npm ci
+        run: npm install --no-audit --no-fund
       - name: Build browser bundle
         run: npm run build
       - name: Commit generated SDK bundle
