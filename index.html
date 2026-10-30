@@ -2209,9 +2209,12 @@ function showFatal(msg){
    all players in a room must use the same transport. */
 const BIGCON_RELAY_URL='https://bigconhosting.wax-no-bones.workers.dev';
 function transportSettings(){
- const mode=$('transportMode')?.value||'cloudflare';
- try{localStorage.setItem('bigcon-transport-mode-v2',mode)}catch(_){}
- return {mode,url:BIGCON_RELAY_URL.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:').replace(/\/+$/,'')};
+  // Discord Activities do not support WebRTC; always use the WebSocket relay there.
+  const requestedMode=$('transportMode')?.value||'cloudflare';
+  const mode=window.__BIGCON_DISCORD_ACTIVITY__?'cloudflare':requestedMode;
+  if(window.__BIGCON_DISCORD_ACTIVITY__&&$('transportMode'))$('transportMode').value='cloudflare';
+  try{localStorage.setItem('bigcon-transport-mode-v2',mode)}catch(_){}
+  return {mode,url:BIGCON_RELAY_URL.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:').replace(/\/+$/,'')};
 }
 function loadTransportSettings(){
  try{
@@ -2823,12 +2826,19 @@ Presence.menu();
 /* Discord Embedded App SDK — only boot inside Discord's Activity iframe.
    Normal browser play remains independent of Discord. */
 if (window.parent !== window) {
+  // Select the WebSocket relay in Discord; WebRTC is not supported by Activities.
+  window.__BIGCON_DISCORD_ACTIVITY__ = true;
   (async () => {
     const appId = "1565709969913815060";
     const inviteButton = document.getElementById("btnDiscordInvite");
     const shareButton = document.getElementById("btnDiscordShare");
     try {
-      const { DiscordSDK } = await import("https://esm.sh/@discord/embedded-app-sdk?bundle");
+      const { DiscordSDK, patchUrlMappings } = await import("https://esm.sh/@discord/embedded-app-sdk?bundle");
+      // Route Cloudflare WebSocket traffic through Discord's Activity proxy.
+      // Configure /relay -> bigconhosting.wax-no-bones.workers.dev in Developer Portal.
+      patchUrlMappings([
+        { prefix: "/relay", target: "bigconhosting.wax-no-bones.workers.dev" }
+      ]);
       const discordSdk = new DiscordSDK(appId);
       await discordSdk.ready();
       window.bigconDiscordSDK = discordSdk;
