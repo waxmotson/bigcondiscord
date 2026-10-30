@@ -2214,7 +2214,10 @@ function transportSettings(){
   const mode=window.__BIGCON_DISCORD_ACTIVITY__?'cloudflare':requestedMode;
   if(window.__BIGCON_DISCORD_ACTIVITY__&&$('transportMode'))$('transportMode').value='cloudflare';
   try{localStorage.setItem('bigcon-transport-mode-v2',mode)}catch(_){}
-  return {mode,url:BIGCON_RELAY_URL.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:').replace(/\/+$/,'')};
+  // In Discord, use the mapped same-origin path. An absolute Worker URL bypasses
+  // the /relay URL mapping and is blocked by the Activity proxy.
+  const relayBase=window.__BIGCON_DISCORD_ACTIVITY__?'/relay':BIGCON_RELAY_URL;
+  return {mode,url:relayBase.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:').replace(/\/+$/,'')};
 }
 function loadTransportSettings(){
  try{
@@ -2904,7 +2907,7 @@ if (window.parent !== window) {
       const detail = error && (error.message || error.toString()) || "Unknown SDK error";
       const status = document.getElementById("netStatus");
       if (status) {
-        status.textContent = "Discord SDK failed to initialise: " + detail + ". Check the /sdk → esm.sh URL mapping.";
+        status.textContent = "Discord SDK failed to initialise: " + detail + ". Check that the Activity is serving the local /static/discord-sdk.bundle.js file.";
         status.classList.add("err");
       }
       window.dispatchEvent(new CustomEvent("bigcon-discord-sdk-error", { detail }));
