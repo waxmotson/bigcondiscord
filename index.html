@@ -2251,11 +2251,19 @@ class CloudflarePeer extends RelayEvents{
  _connectSocket(room,role){
   let base;try{base=this._baseUrl()}catch(e){this.emit('error',{type:'configuration',message:e.message});return}
   const url=base.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:')+'/ws/'+encodeURIComponent(room)+'?role='+role;
+  let settled=false;
   const ws=new WebSocket(url);this.socket=ws;
+  const handshakeTimer=setTimeout(()=>{
+   if(settled||this.destroyed)return;
+   settled=true;
+   try{ws.close()}catch(_){}
+   this.emit('error',{type:'socket-timeout',message:'Discord relay did not complete its handshake. Check the /relay URL mapping and Worker connection.'});
+  },12000);
   ws.addEventListener('open',()=>{if(this.destroyed){ws.close();return}ws.send(JSON.stringify({type:'join',role}));});
   ws.addEventListener('message',ev=>{
    let m;try{m=JSON.parse(ev.data)}catch(_){return}
    if(m.type==='ready'){
+    settled=true;clearTimeout(handshakeTimer);
     if(role==='host'){this.emit('open',this.id);return}
     const c=this.connections.get('outgoing');if(c&&!c.open){c.id=m.id;c.open=true;c.emit('open');}
    }else if(m.type==='incoming'&&role==='host'){
@@ -2273,12 +2281,14 @@ class CloudflarePeer extends RelayEvents{
   });
   let failureNotified=false;
   ws.addEventListener('close',()=>{
+   clearTimeout(handshakeTimer);
    if(this.destroyed)return;
    this.disconnected=true;
    for(const c of this.connections.values()){if(c.open){c.open=false;c.emit('close')}}
    if(!failureNotified){failureNotified=true;if(this.hostSide)this.emit('disconnected');else this.emit('error',{type:'socket-closed',message:'Cloudflare relay connection closed'})}
   });
   ws.addEventListener('error',()=>{
+   clearTimeout(handshakeTimer);
    if(this.destroyed||failureNotified)return;
    failureNotified=true;
    if(this.hostSide)this.emit('disconnected');
@@ -2362,6 +2372,10 @@ function hostOpenPeer(){
   if(Net.peer!==p)return;
   if(ty==='unavailable-id'&&!opened&&!Net.started){try{p.destroy()}catch(x){}Net.roomCode=genCode();Net.roomLabel=codeLabel(Net.roomCode);hostReopenAttempt=0;hostOpenPeer();return}
   if(ty==='unavailable-id'){scheduleHostReopen('Room ID is temporarily registered elsewhere');return}
+  if(ty==='socket-timeout'){
+   setNetStatus((e&&e.message)||'Relay handshake timed out. Check Discord URL mappings.',true);
+   return;
+  }
   if(ty==='network'||ty==='socket-error'||ty==='socket-closed'||ty==='server-error'){
    // Back off rather than repeatedly destroying/recreating the peer in a tight loop.
    scheduleHostReopen('Matchmaker error ('+ty+')');
@@ -2833,7 +2847,8 @@ if (window.parent !== window) {
     const inviteButton = document.getElementById("btnDiscordInvite");
     const shareButton = document.getElementById("btnDiscordShare");
     try {
-      const { DiscordSDK, patchUrlMappings } = await import("https://esm.sh/@discord/embedded-app-sdk?bundle");
+      // Load the SDK itself through Discord's proxy; direct esm.sh imports may be blocked by Activity CSP.
+      const { DiscordSDK, patchUrlMappings } = await import("/sdk/@discord/embedded-app-sdk?bundle");
       // Route Cloudflare WebSocket traffic through Discord's Activity proxy.
       // Configure /relay -> bigconhosting.wax-no-bones.workers.dev in Developer Portal.
       patchUrlMappings([
