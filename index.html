@@ -2851,8 +2851,8 @@ if (window.parent !== window) {
     const inviteButton = document.getElementById("btnDiscordInvite");
     const shareButton = document.getElementById("btnDiscordShare");
     try {
-      // Load the SDK itself through Discord's proxy; direct esm.sh imports may be blocked by Activity CSP.
-      const { DiscordSDK, patchUrlMappings } = await import("/sdk/@discord/embedded-app-sdk?bundle");
+      // Load the official SDK from this Activity's own static assets.
+      const { DiscordSDK, patchUrlMappings } = await import("/static/discord-sdk.bundle.js");
       // Route Cloudflare WebSocket traffic through Discord's Activity proxy.
       // Configure /relay -> bigconhosting.wax-no-bones.workers.dev in Developer Portal.
       patchUrlMappings([
