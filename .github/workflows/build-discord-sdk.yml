@@ -28,7 +28,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if git diff --quiet -- static/discord-sdk.bundle.js package-lock.json; then
+          if [[ -z "$(git status --porcelain -- static/discord-sdk.bundle.js package-lock.json)" ]]; then
             echo "SDK bundle is already up to date."
             exit 0
           fi
