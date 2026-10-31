@@ -553,7 +553,7 @@ function applyQuikSlot(slot){
 const TYPE_COLORS={BANK:'#a87511',COMMODITY:'#c05621',MEDIA:'#b5308c',CORPORATE:'#1f6f8b',REGULATOR:'#5c6b73',CHART:'#2e8b57',WILD:'#6b4fa0'};
 const PCOLORS=['#f5c542','#55c1ff','#e19bff','#7fe08d','#ff5e9c','#ffffff','#00e5c0','#ffa94d'];
 const MAXPLAYERS=8;
-const CHARURL='https://raw.githubusercontent.com/waxmotson/bigcon/main/characters/';
+const CHARURL='/characters/';
 const CHARS=[
  {id:'markwatson',name:'Mark Watson',file:'markwatson.png',color:'#f5c542'},
  {id:'tomkins',name:'Tomkins',file:'tomkins.png',color:'#55c1ff'},
@@ -563,10 +563,10 @@ const CHARS=[
  {id:'denialswan',name:'Denial Swan',file:'denialswan.png',color:'#ffffff'},
  {id:'japsnchen',name:'Japsn Chen',file:'japsnchen.png',color:'#00e5c0'},
  {id:'thousandyardwax',name:'Thousand Yard Wax',file:'thousandyardwax.png',color:'#ffa94d'},
- {id:'Alexander_Lane',name:'The guy from Toktimer',file:'Alexander_Lane.png',url:'https://raw.githubusercontent.com/waxmotson/bigcon3D/master/characters/Alexander_Lane.png',color:'#ff6b5e'},
- {id:'DJT',name:'QUITE FRANKLY',file:'DJT.png',url:'https://raw.githubusercontent.com/waxmotson/bigcon3D/master/characters/DJT.png',color:'#9b8cff'},
- {id:'thebigag',name:'The Big Ag',file:'thebigag.png',url:'https://raw.githubusercontent.com/waxmotson/bigcon3D/master/characters/thebigag.png',color:'#d6e85c'},
- {id:'thebigwegrzyn',name:'Seth Wegrzyn',file:'thebigwegrzyn.png',url:'https://raw.githubusercontent.com/waxmotson/bigcon3D/master/characters/thebigwegrzyn.png',color:'#e8a07a'}
+ {id:'Alexander_Lane',name:'The guy from Toktimer',file:'Alexander_Lane.png',url:'/characters/Alexander_Lane.png',color:'#ff6b5e'},
+ {id:'DJT',name:'QUITE FRANKLY',file:'DJT.png',url:'/characters/DJT.png',color:'#9b8cff'},
+ {id:'thebigag',name:'The Big Ag',file:'thebigag.png',url:'/characters/thebigag.png',color:'#d6e85c'},
+ {id:'thebigwegrzyn',name:'Seth Wegrzyn',file:'thebigwegrzyn.png',url:'/characters/thebigwegrzyn.png',color:'#e8a07a'}
 ];
 function charMeta(id){return CHARS.find(c=>c.id===id)||null}
 function charSrc(id){const c=charMeta(id);return c?(c.url||CHARURL+c.file):''}
