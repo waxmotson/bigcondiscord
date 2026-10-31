@@ -5,7 +5,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>THE BIG CON v1.12</title>
 <link rel="icon" href="favicon.ico">
-<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 <style>
 *{box-sizing:border-box}
 html,body{margin:0;padding:0;width:100%;height:100%}
@@ -228,14 +227,6 @@ body.game-open{overflow:hidden}
    <button class="gobtn" id="btnStart" style="margin-top:12px" disabled>🔥 START THE CON (need 2+ players)</button>
   </div>
   <div id="netStatus"></div>
-  <div class="netform show" id="transportSettings" style="display:flex;margin-top:8px">
-   <label class="namelab" style="font-size:12px;color:#9ad;flex-wrap:wrap">Connection system
-    <select id="transportMode" style="flex:1;min-width:150px;background:#000;color:#fff;border:1px solid #168388;padding:8px;font:inherit">
-     <option value="cloudflare">Cloudflare relay (default)</option><option value="peerjs">PeerJS / WebRTC fallback</option>
-    </select>
-   </label>
-   <div id="relayHelp" style="font-size:11px;color:#9ad;line-height:1.4">Cloudflare relay is the default. If it is unavailable, switch to PeerJS / WebRTC; everyone in the room must use the same connection system.</div>
-  </div>
   <div class="setuplinks"><button data-srules>📖 How to play</button></div>
  </div>
 </div>
@@ -251,6 +242,8 @@ body.game-open{overflow:hidden}
 
 <script>
 'use strict';
+// This repository is a Discord Activity, not a general-purpose web client.
+window.__BIGCON_DISCORD_ACTIVITY__ = true;
 /* Keep this equal to the parent commit's 7-character SHA; CI enforces updates. */
 const BUILD_COMMIT = 'a81afd1';
 const $=id=>document.getElementById(id);
@@ -2174,8 +2167,6 @@ function handleNodeTap(t){
  }
 });
 
-/* Initialise optional transport preferences after the setup controls exist. */
-loadTransportSettings();
 /* ================= NETWORKING ================= */
 const PFX='bigcon-oz-';
 /* Room codes are jt portal buzzwords — every one of these has its own line in
@@ -2203,35 +2194,10 @@ function showFatal(msg){
  ov.appendChild(card);document.body.appendChild(ov);
 }
 
-/* ---- DEFAULT CLOUDFLARE DURABLE OBJECT RELAY ----
-   The deployed Worker URL is built in, so players do not need to configure it.
-   PeerJS remains available as a fallback transport if the relay is unavailable;
-   all players in a room must use the same transport. */
-const BIGCON_RELAY_URL='https://bigconhosting.wax-no-bones.workers.dev';
+/* Discord-only networking: the Activity proxy maps /relay to the Cloudflare
+   Worker. No direct Worker URL or alternate transport is supported here. */
 function transportSettings(){
-  // Discord Activities do not support WebRTC; always use the WebSocket relay there.
-  const requestedMode=$('transportMode')?.value||'cloudflare';
-  const mode=window.__BIGCON_DISCORD_ACTIVITY__?'cloudflare':requestedMode;
-  if(window.__BIGCON_DISCORD_ACTIVITY__&&$('transportMode'))$('transportMode').value='cloudflare';
-  try{localStorage.setItem('bigcon-transport-mode-v2',mode)}catch(_){}
-  // In Discord, use the mapped same-origin path. An absolute Worker URL bypasses
-  // the /relay URL mapping and is blocked by the Activity proxy.
-  const relayBase=window.__BIGCON_DISCORD_ACTIVITY__?'/relay':BIGCON_RELAY_URL;
-  return {mode,url:relayBase.replace(/^https:/i,'wss:').replace(/^http:/i,'ws:').replace(/\/+$/,'')};
-}
-function loadTransportSettings(){
- try{
-  const mode=localStorage.getItem('bigcon-transport-mode-v2')||'cloudflare';
-  if($('transportMode'))$('transportMode').value=mode;
- }catch(_){}
- const refresh=()=>{
-  const mode=$('transportMode')?.value||'cloudflare';
-  if($('relayHelp'))$('relayHelp').textContent=mode==='cloudflare'
-   ?'Using the built-in Cloudflare relay. No URL setup is needed.'
-   :'PeerJS / WebRTC direct or TURN fallback is active. Everyone joining the room must select the same connection system.';
- };
- $('transportMode')?.addEventListener('change',()=>{transportSettings();refresh()});
- loadTransportSettings._refresh=refresh;refresh();
+ return {mode:'cloudflare',url:'/relay'};
 }
 class RelayEvents{
  constructor(){this.events={}}
@@ -2311,11 +2277,7 @@ class CloudflarePeer extends RelayEvents{
  reconnect(){if(this.destroyed)return;this._connectSocket(this.id?this.id.slice(PFX.length):Net.roomCode,this.hostSide?'host':'guest')}
  destroy(){this.destroyed=true;for(const c of this.connections.values())c.close();if(this.socket){try{this.socket.close()}catch(_){}}this.emit('close')}
 }
-function selectedPeerClass(){
- const cfg=transportSettings();
- if(cfg.mode!=='cloudflare')return Peer;
- return CloudflarePeer;
-}
+function selectedPeerClass(){ return CloudflarePeer; }
 
 /* ---- WEBRTC / ICE CONFIG ---- */
 /* Keep game traffic peer-to-peer. STUN discovers routes; TURN relays only when
@@ -2844,11 +2806,9 @@ Presence.menu();
 </script>
 
 <script type="module">
-/* Discord Embedded App SDK — only boot inside Discord's Activity iframe.
-   Normal browser play remains independent of Discord. */
-if (window.parent !== window) {
-  // Select the WebSocket relay in Discord; WebRTC is not supported by Activities.
-  window.__BIGCON_DISCORD_ACTIVITY__ = true;
+/* Discord Embedded App SDK — mandatory for this Discord-only client. */
+{
+  // WebRTC and direct-browser networking are deliberately not supported.
   (async () => {
     const appId = "1565709969913815060";
     const inviteButton = document.getElementById("btnDiscordInvite");
@@ -2859,7 +2819,8 @@ if (window.parent !== window) {
       // Route Cloudflare WebSocket traffic through Discord's Activity proxy.
       // Configure /relay -> bigconhosting.wax-no-bones.workers.dev in Developer Portal.
       patchUrlMappings([
-        { prefix: "/relay", target: "bigconhosting.wax-no-bones.workers.dev" }
+        { prefix: "/relay", target: "bigconhosting.wax-no-bones.workers.dev" },
+        { prefix: "/", target: "bigcondiscord.onrender.com" }
       ]);
       const discordSdk = new DiscordSDK(appId);
       await discordSdk.ready();
@@ -2901,15 +2862,18 @@ if (window.parent !== window) {
         });
       }
       window.dispatchEvent(new CustomEvent("bigcon-discord-ready"));
+      const status = document.getElementById("netStatus");
+      if (status) { status.textContent = "Discord connected — Cloudflare relay ready."; status.classList.remove("err"); }
       console.info("[BigCon Discord] Embedded App SDK ready.");
     } catch (error) {
       console.error("[BigCon Discord] Activity SDK could not initialise:", error);
       const detail = error && (error.message || error.toString()) || "Unknown SDK error";
       const status = document.getElementById("netStatus");
       if (status) {
-        status.textContent = "Discord SDK failed to initialise: " + detail + ". Check that the Activity is serving the local /static/discord-sdk.bundle.js file.";
+        status.textContent = "Discord SDK failed to initialise: " + detail;
         status.classList.add("err");
       }
+      document.querySelectorAll("#btnHost,#btnJoin,#btnCreate,#btnJoinGo").forEach(button => button.disabled = true);
       window.dispatchEvent(new CustomEvent("bigcon-discord-sdk-error", { detail }));
     }
   })();
